@@ -28,7 +28,7 @@ library
                        Control.Monad.Writer.Concurrent
                        Control.Monad.Writer.Concurrent.Lazy
                        Control.Monad.Writer.Concurrent.Strict
-  build-depends:       base         >= 4.2 && < 4.8
+  build-depends:       base         >= 4.2
                      , exceptions   >= 0.3
                      , mtl          >= 2.1
                      , stm
