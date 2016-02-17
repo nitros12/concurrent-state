@@ -2,6 +2,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -37,8 +39,10 @@ import Control.Concurrent.MVar
 import Control.Concurrent.STM
 import Control.Exception (throwIO)
 import Control.Monad
+import Control.Monad.Base
 import Control.Monad.Catch
 import Control.Monad.State
+import Control.Monad.Trans.Control
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 706
 import Prelude hiding (catch)
 #endif
@@ -122,6 +126,19 @@ instance MonadFork m => MonadFork (StateC s m) where
     fork = liftFork fork
     forkOn i = liftFork (forkOn i)
     forkOS = liftFork forkOS
+
+instance (MonadIO m, MonadBase b m) => MonadBase b (StateC s m) where
+    liftBase = liftBaseDefault
+
+instance MonadTransControl (StateC s) where
+    type StT (StateC s) a = (a, TVar s)
+    liftWith run = StateC $ \s -> liftM (\x -> (x,s)) (run $ \t -> _runStateC t s)
+    restoreT = StateC . const
+
+instance (MonadIO m, MonadBaseControl b m) => MonadBaseControl b (StateC s m) where
+    type StM (StateC s m) a = ComposeSt (StateC s) m a
+    liftBaseWith = defaultLiftBaseWith
+    restoreM = defaultRestoreM
 
 liftFork :: Monad m => (m () -> m a) -> StateC t m () -> StateC t m a
 liftFork f (StateC m) = StateC $ \tv -> do
@@ -221,3 +238,4 @@ execStatesC :: MonadFork m
             -> s -- ^ initial state
             -> m s -- ^ final state
 execStatesC ms s = liftM snd $ runStatesC ms s
+
