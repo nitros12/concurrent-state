@@ -121,6 +121,20 @@ instance (MonadIO m, MonadMask m) => MonadMask (StateC s m) where
     uninterruptibleMask a =
         StateC $ \tv -> uninterruptibleMask $ \u -> _runStateC (a $ q u) tv where
         q u (StateC f) = StateC (u . f)
+    generalBracket acquire release use = StateC $ \s0 -> do
+    -- This implementation is given as an example in the documentation of
+    -- 'generalBracket', so when changing it, remember to update the
+    -- documentation's copy as well
+      ((b, _s2), (c, s3)) <- generalBracket
+        (runStateC acquire s0)
+        (\(resource, s1) exitCase -> case exitCase of
+            ExitCaseSuccess (b, s2) -> runStateC (release resource (ExitCaseSuccess b)) s2
+            -- In the two other cases, the base monad overrides @use@'s state
+            -- changes and the state reverts to @s1@.
+            ExitCaseException e     -> runStateC (release resource (ExitCaseException e)) s1
+            ExitCaseAbort           -> runStateC (release resource ExitCaseAbort) s1)
+        (\(resource, s1) -> runStateC (use resource) s1)
+      return ((b, c), s3)
 
 instance MonadFork m => MonadFork (StateC s m) where
     fork = liftFork fork
